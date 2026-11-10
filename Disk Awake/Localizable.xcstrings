@@ -2,58 +2,277 @@
   "sourceLanguage" : "en",
   "strings" : {
     "%lld connected" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%lld đã kết nối"
+          }
+        }
+      }
     },
     "Connect a drive to get started" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Hãy kết nối ổ đĩa để bắt đầu"
+          }
+        }
+      }
     },
     "Disk Awake" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Disk Awake"
+          }
+        }
+      }
+    },
+    "Error: Could not write to the drive (%@, code %lld)." : {
+      "comment" : "Write failure; first value is the error domain, second is the error code.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Error: Could not write to the drive (%1$@, code %2$lld)."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Lỗi: Không thể ghi vào ổ đĩa (%1$@, mã %2$lld)."
+          }
+        }
+      }
     },
     "External Drives" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Ổ đĩa ngoài"
+          }
+        }
+      }
     },
     "How Disk Awake works" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Cách Disk Awake hoạt động"
+          }
+        }
+      }
     },
     "Keep awake every 30 seconds" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Giữ ổ đĩa hoạt động mỗi 30 giây"
+          }
+        }
+      }
     },
     "Keep Drives Awake" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Giữ ổ đĩa hoạt động"
+          }
+        }
+      }
+    },
+    "Keep external drives active with periodic writes" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Giữ ổ đĩa ngoài hoạt động bằng cách ghi định kỳ"
+          }
+        }
+      }
     },
     "Last write %@" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Ghi lần cuối lúc %@"
+          }
+        }
+      }
     },
     "No writes yet" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Chưa ghi lần nào"
+          }
+        }
+      }
     },
     "Paused" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Đã tạm dừng"
+          }
+        }
+      }
     },
     "Pauses when your Mac sleeps and resumes when it wakes. Every 30 seconds, writes and syncs 4 KB to a hidden file on each selected drive. Effectiveness depends on the drive or DAS firmware." : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Tạm dừng khi máy Mac của bạn ngủ và tiếp tục khi máy thức dậy. Cứ mỗi 30 giây, ứng dụng ghi và đồng bộ hóa 4 KB vào một tệp ẩn trên mỗi ổ đĩa được chọn. Hiệu quả phụ thuộc vào phần sụn của ổ đĩa hoặc DAS."
+          }
+        }
+      }
     },
     "Quit" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Thoát"
+          }
+        }
+      }
     },
     "Read-only drive" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Ổ đĩa chỉ đọc"
+          }
+        }
+      }
+    },
+    "Waiting for the first write" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Đang chờ lần ghi đầu tiên"
+          }
+        }
+      }
     },
     "Waiting…" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Đang chờ…"
+          }
+        }
+      }
     },
     "Write 30s · Scan 15s" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Ghi 30 giây · Quét 15 giây"
+          }
+        }
+      }
     },
     "Write failed" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Ghi không thành công"
+          }
+        }
+      }
     },
     "Write in %llds" : {
-
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "Write in %llds"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "Write in %llds"
+                }
+              },
+              "zero" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "Write in %llds"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "Ghi sau %lld giây"
+                }
+              },
+              "zero" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "Ghi sau %lld giây"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "Writing…" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Đang ghi…"
+          }
+        }
+      }
+    },
+    "Written and synced to the drive" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Đã ghi và đồng bộ hóa vào ổ đĩa"
+          }
+        }
+      }
+    },
+    "Written; the drive only supports fsync" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Đã ghi; ổ đĩa chỉ hỗ trợ fsync"
+          }
+        }
+      }
     }
   },
   "version" : "1.3"

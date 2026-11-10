@@ -9,7 +9,8 @@ struct MountedDisk: Identifiable, Equatable, Sendable {
     let name: String
     let writable: Bool
     var lastSuccess: Date?
-    var message = "Waiting for the first write"
+    var message = String(localized: "Waiting for the first write")
+    var hasWriteError = false
 }
 
 // All filesystem work runs off the main actor. Descriptors are closed after
@@ -161,6 +162,7 @@ final class DiskAwakeModel {
             if let previous = disks.first(where: { $0.id == disk.id && $0.url == disk.url }) {
                 updated.lastSuccess = previous.lastSuccess
                 updated.message = previous.message
+                updated.hasWriteError = previous.hasWriteError
             }
             return updated
         }
@@ -178,7 +180,7 @@ final class DiskAwakeModel {
             // Disable App Nap, but allow the Mac itself to sleep normally.
             activity = ProcessInfo.processInfo.beginActivity(
                 options: [.userInitiatedAllowingIdleSystemSleep],
-                reason: "Keep external drives active with periodic writes"
+                reason: String(localized: "Keep external drives active with periodic writes")
             )
         } else if !active, let activity {
             ProcessInfo.processInfo.endActivity(activity)
@@ -198,12 +200,16 @@ final class DiskAwakeModel {
                 )
                 if let index = disks.firstIndex(where: { $0.id == disk.id }) {
                     disks[index].lastSuccess = Date()
-                    disks[index].message = fullSync ? "Written and synced to the drive" : "Written; the drive only supports fsync"
+                    disks[index].hasWriteError = false
+                    disks[index].message = fullSync
+                        ? String(localized: "Written and synced to the drive")
+                        : String(localized: "Written; the drive only supports fsync")
                 }
             } catch {
                 if let index = disks.firstIndex(where: { $0.id == disk.id }) {
                     let nsError = error as NSError
-                    disks[index].message = "Error: Could not write to the drive (\(nsError.domain), code \(nsError.code))."
+                    disks[index].hasWriteError = true
+                    disks[index].message = String(localized: "Error: Could not write to the drive (\(nsError.domain), code \(nsError.code)).", comment: "Write failure; first value is the error domain, second is the error code.")
                 }
             }
         }

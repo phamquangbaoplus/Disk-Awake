@@ -29,7 +29,7 @@ private struct AwakeHeader: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text("Disk Awake").font(.title2.bold())
-                Text(enabled ? "Keep awake every 30 seconds" : "Paused")
+                Text(enabled ? LocalizedStringResource("Keep awake every 30 seconds") : LocalizedStringResource("Paused"))
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
@@ -122,7 +122,7 @@ private struct DiskRow: View {
                     .foregroundStyle(.secondary)
             } else {
                 HStack {
-                    if disk.message.hasPrefix("Error:") {
+                    if disk.hasWriteError {
                         Label("Write failed", systemImage: "exclamationmark.triangle")
                             .foregroundStyle(.orange)
                             .help(disk.message)
