@@ -1,0 +1,60 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%lld connected" : {
+
+    },
+    "Connect a drive to get started" : {
+
+    },
+    "Disk Awake" : {
+
+    },
+    "External Drives" : {
+
+    },
+    "How Disk Awake works" : {
+
+    },
+    "Keep awake every 30 seconds" : {
+
+    },
+    "Keep Drives Awake" : {
+
+    },
+    "Last write %@" : {
+
+    },
+    "No writes yet" : {
+
+    },
+    "Paused" : {
+
+    },
+    "Pauses when your Mac sleeps and resumes when it wakes. Every 30 seconds, writes and syncs 4 KB to a hidden file on each selected drive. Effectiveness depends on the drive or DAS firmware." : {
+
+    },
+    "Quit" : {
+
+    },
+    "Read-only drive" : {
+
+    },
+    "Waiting…" : {
+
+    },
+    "Write 30s · Scan 15s" : {
+
+    },
+    "Write failed" : {
+
+    },
+    "Write in %llds" : {
+
+    },
+    "Writing…" : {
+
+    }
+  },
+  "version" : "1.3"
+}
