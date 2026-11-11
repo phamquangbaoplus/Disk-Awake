@@ -2,6 +2,10 @@
 
 A lightweight macOS menu bar app that helps keep external drives awake with periodic writes, with a separate option to prevent your Mac from sleeping automatically.
 
+<p align="center">
+  <img width="335" height="186" alt="screenshot" src="https://github.com/user-attachments/assets/9740b725-c310-4a7e-920b-a3c1a4cbfae9" />
+</p>
+
 ## Features
 
 - Automatically detects connected external drives.
