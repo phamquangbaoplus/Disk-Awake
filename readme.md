@@ -1,30 +1,26 @@
 # Disk Awake
 
-Ứng dụng nhỏ trên thanh menu macOS, giúp giữ ổ đĩa ngoài hoạt động bằng cách ghi dữ liệu định kỳ và tùy chọn ngăn Mac tự động ngủ.
+A lightweight macOS menu bar app that helps keep external drives awake with periodic writes, with a separate option to prevent your Mac from sleeping automatically.
 
-<p align="center">
-  <img src=".github/assets/disk-awake.png" alt="Disk Awake trên thanh menu macOS với hai công tắc Keep Mac Awake và Keep All External Drives Awake" width="560">
-</p>
+## Features
 
-## Tính năng
+- Automatically detects mounted external volumes.
+- Writes 4 KiB every 30 seconds to each writable external volume.
+- Controls periodic writes for all external drives with a single toggle.
+- Keeps your Mac awake independently of drive activity.
+- Displays the connected volume count, a countdown to the next write, and write error counts.
+- Runs in the menu bar without a Dock icon.
+- Pauses writes during system sleep and resumes after the display wakes.
 
-- Tự động nhận diện các ổ đĩa ngoài đang được gắn vào máy.
-- Ghi 4 KiB mỗi 30 giây lên mỗi volume ngoài có thể ghi.
-- Bật hoặc tắt việc giữ tất cả ổ ngoài hoạt động bằng một công tắc.
-- Giữ Mac thức độc lập với tính năng ghi lên ổ đĩa.
-- Hiển thị số volume kết nối, thời gian đến lần ghi tiếp theo và số lỗi ghi.
-- Chạy trên thanh menu, không có biểu tượng trong Dock.
-- Tạm dừng ghi khi hệ thống ngủ và tiếp tục sau khi màn hình thức dậy.
+## Requirements
 
-## Yêu cầu
+- **macOS 27.2 or later**, based on the project's current deployment target.
+- An Xcode version that supports the project format and required SDK. The project currently records Xcode 27.2 as its last upgrade version.
+- Write access to the root directory of each external volume you want to keep active.
 
-- **macOS 27.2 trở lên**, theo deployment target hiện tại của dự án.
-- Xcode hỗ trợ định dạng dự án và SDK tương ứng để biên dịch từ mã nguồn. Cấu hình dự án hiện ghi nhận Xcode 27.2.
-- Quyền ghi vào thư mục gốc của volume ngoài để dùng tính năng giữ ổ hoạt động.
+## Build from Source
 
-## Biên dịch và chạy
-
-1. Clone repository:
+1. Clone the repository and open the project:
 
    ```sh
    git clone https://github.com/phamquangbaoplus/Disk-Awake.git
@@ -32,55 +28,54 @@
    open "Disk Awake.xcodeproj"
    ```
 
-2. Chọn scheme **Disk Awake** và đích chạy **My Mac** trong Xcode.
-3. Nếu Xcode yêu cầu cấu hình ký ứng dụng, chọn development team của bạn trong **Signing & Capabilities**.
-4. Nhấn **⌘R** để biên dịch và chạy.
-5. Bấm biểu tượng ổ đĩa trên thanh menu để mở bảng điều khiển.
+2. Select the **Disk Awake** scheme and **My Mac** as the run destination.
+3. If Xcode requests signing configuration, select your development team under **Signing & Capabilities**.
+4. Press **Command-R** to build and run.
+5. Click the drive icon in the menu bar to open the controls.
 
-## Cách sử dụng
+## Usage
 
-| Điều khiển | Chức năng |
+| Control | Behavior |
 | --- | --- |
-| **Keep Mac Awake** | Ngăn hệ thống tự động ngủ do không hoạt động. Màn hình vẫn có thể ngủ và bạn vẫn có thể cho Mac ngủ thủ công. |
-| **Keep All External Drives Awake** | Bật hoặc tắt việc ghi định kỳ cho tất cả volume ngoài có thể ghi. |
-| **Quit** | Thoát ứng dụng, dừng ghi và giải phóng yêu cầu giữ Mac thức. |
+| **Keep Mac Awake** | Prevents automatic system sleep due to inactivity. The display can still sleep, and you can still put your Mac to sleep manually. |
+| **Keep All External Drives Awake** | Enables or disables periodic writes to all writable external volumes. |
+| **Quit** | Exits the app, stops periodic writes, and releases the request to keep your Mac awake. |
 
-Tính năng giữ ổ ngoài hoạt động mặc định được bật trong lần chạy đầu và ghi nhớ lựa chọn giữa các lần mở ứng dụng. **Keep Mac Awake** mặc định tắt mỗi khi khởi động ứng dụng và chỉ áp dụng cho phiên hiện tại.
+External drive activity is enabled by default on first launch, and your preference is saved between launches. **Keep Mac Awake** starts disabled each time you launch the app and applies only to the current session.
 
-## Cơ chế hoạt động
+## How It Works
 
-Ứng dụng quét các volume mỗi 15 giây, chọn volume cục bộ được macOS nhận diện là bên ngoài và bỏ qua volume ẩn. Ổ nội bộ và ổ mạng không thuộc phạm vi xử lý; volume chỉ đọc được nhận diện nhưng không được ghi.
+Disk Awake scans mounted volumes every 15 seconds. It selects local volumes that macOS identifies as external and skips hidden volumes. Internal drives and network shares are excluded. Read-only volumes are detected but never written to.
 
-Trên mỗi volume có thể ghi, Disk Awake tạo một tệp ẩn có tên `.disk-awake-<UUID>` trong thư mục gốc. Mỗi lần ghi sẽ thay nội dung bằng 4 KiB dữ liệu ngẫu nhiên, giữ kích thước tệp ở 4 KiB và yêu cầu đồng bộ xuống ổ đĩa bằng `F_FULLFSYNC`, với `fsync` làm phương án dự phòng. Tệp được đóng sau mỗi lần ghi.
+For each writable external volume, the app creates a hidden file named `.disk-awake-<UUID>` in the volume's root directory. Each write replaces its contents with 4 KiB of random data, keeps the file at 4 KiB, and requests synchronization to the drive using `F_FULLFSYNC`, falling back to `fsync` if needed. The file is closed after each write.
 
-Tệp này được tái sử dụng và không tự xóa khi thoát. Nếu không còn dùng ứng dụng, bạn có thể thoát Disk Awake rồi xóa tệp `.disk-awake-<UUID>` do ứng dụng tạo trên từng volume.
+The same file is reused and remains on the volume after the app quits. To remove it, quit Disk Awake, then delete the `.disk-awake-<UUID>` file created by the app on each volume.
 
-Việc ghi định kỳ giúp tạo hoạt động trên ổ đĩa; hiệu quả chống ngủ còn phụ thuộc vào phần cứng và firmware của ổ hoặc hộp chuyển đổi. Bật giữ ổ ngoài hoạt động riêng lẻ không ngăn Mac ngủ.
+Periodic writes create drive activity, but whether they prevent sleep depends on the drive or enclosure hardware and firmware. Keeping external drives active does not, by itself, prevent your Mac from sleeping.
 
-## Khắc phục sự cố
+## Troubleshooting
 
-| Trạng thái | Cách kiểm tra |
+| Status or issue | What to check |
 | --- | --- |
-| **No external drives** | Kiểm tra ổ đã được mount trong Finder và chờ lần quét tiếp theo, thường trong vòng 15 giây. |
-| **Read-only drives** | Kiểm tra định dạng và quyền ghi của volume. Ứng dụng không ghi lên volume chỉ đọc. |
-| **Paused** | Bật **Keep All External Drives Awake** để tiếp tục ghi. |
-| **write errors** | Kiểm tra kết nối, dung lượng trống và quyền ghi vào thư mục gốc của volume. |
-| Ổ vẫn ngủ | Kiểm tra chế độ tiết kiệm điện của ổ hoặc hộp chuyển đổi; một số thiết bị có cơ chế ngủ riêng. |
+| **No external drives** | Confirm the drive is mounted in Finder, then allow up to 15 seconds for the next scan. |
+| **Read-only drives** | Check the volume's file system and write permissions. The app skips writes to read-only volumes. |
+| **Paused** | Enable **Keep All External Drives Awake** to resume periodic writes. |
+| **write errors** | Check the drive connection, available space, and write access to the volume's root directory. |
+| The drive still sleeps | Check the drive or enclosure's power-saving settings. Some devices manage sleep independently. |
 
-## Cấu trúc dự án
+## Project Structure
 
-| Đường dẫn | Vai trò |
+| Path | Purpose |
 | --- | --- |
-| `Disk Awake/MyApp.swift` | Điểm khởi chạy ứng dụng và giao diện thanh menu. |
-| `Disk Awake/ContentView.swift` | Công tắc điều khiển, trạng thái và đếm ngược. |
-| `Disk Awake/DiskAwakeModel.swift` | Phát hiện volume, ghi định kỳ và quản lý trạng thái ngủ/thức. |
-| `Disk Awake/Localizable.xcstrings` | Chuỗi giao diện và bản dịch. |
-| `.github/assets/` | Ảnh phục vụ README, nằm ngoài thư mục mã nguồn ứng dụng. |
+| `Disk Awake/MyApp.swift` | App entry point and menu bar setup. |
+| `Disk Awake/ContentView.swift` | Controls, status indicators, and write countdown. |
+| `Disk Awake/DiskAwakeModel.swift` | Volume discovery, periodic writes, and sleep/wake handling. |
+| `Disk Awake/Localizable.xcstrings` | Interface strings and translations. |
 
-## Đóng góp
+## Contributing
 
-Bạn có thể [báo lỗi hoặc đề xuất tính năng](https://github.com/phamquangbaoplus/Disk-Awake/issues). Khi báo lỗi liên quan đến ổ đĩa, hãy kèm phiên bản macOS, loại ổ hoặc hộp chuyển đổi, định dạng volume và các bước tái hiện.
+Bug reports and feature requests are welcome through [GitHub Issues](https://github.com/phamquangbaoplus/Disk-Awake/issues). For drive-related issues, include your macOS version, drive or enclosure model, volume format, and steps to reproduce the problem.
 
-## Giấy phép
+## License
 
-Repository hiện chưa có tệp `LICENSE` quy định giấy phép sử dụng mã nguồn.
+This repository does not currently include a `LICENSE` file.
