@@ -11,7 +11,18 @@
         }
       }
     },
+    "%lld write errors" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%lld lỗi ghi"
+          }
+        }
+      }
+    },
     "Connect a drive to get started" : {
+      "extractionState" : "stale",
       "localizations" : {
         "vi" : {
           "stringUnit" : {
@@ -49,6 +60,7 @@
       }
     },
     "External Drives" : {
+      "extractionState" : "stale",
       "localizations" : {
         "vi" : {
           "stringUnit" : {
@@ -59,6 +71,7 @@
       }
     },
     "How Disk Awake works" : {
+      "extractionState" : "stale",
       "localizations" : {
         "vi" : {
           "stringUnit" : {
@@ -68,7 +81,18 @@
         }
       }
     },
+    "Keep All External Drives Awake" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Giữ tất cả ổ đĩa ngoài hoạt động"
+          }
+        }
+      }
+    },
     "Keep awake every 30 seconds" : {
+      "extractionState" : "stale",
       "localizations" : {
         "vi" : {
           "stringUnit" : {
@@ -79,6 +103,7 @@
       }
     },
     "Keep Drives Awake" : {
+      "extractionState" : "stale",
       "localizations" : {
         "vi" : {
           "stringUnit" : {
@@ -98,7 +123,18 @@
         }
       }
     },
+    "Keep Mac Awake" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Giữ máy Mac hoạt động"
+          }
+        }
+      }
+    },
     "Last write %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "vi" : {
           "stringUnit" : {
@@ -108,7 +144,18 @@
         }
       }
     },
+    "No external drives" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Không có ổ đĩa ngoài"
+          }
+        }
+      }
+    },
     "No writes yet" : {
+      "extractionState" : "stale",
       "localizations" : {
         "vi" : {
           "stringUnit" : {
@@ -129,11 +176,22 @@
       }
     },
     "Pauses when your Mac sleeps and resumes when it wakes. Every 30 seconds, writes and syncs 4 KB to a hidden file on each selected drive. Effectiveness depends on the drive or DAS firmware." : {
+      "extractionState" : "stale",
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "Tạm dừng khi máy Mac của bạn ngủ và tiếp tục khi máy thức dậy. Cứ mỗi 30 giây, ứng dụng ghi và đồng bộ hóa 4 KB vào một tệp ẩn trên mỗi ổ đĩa được chọn. Hiệu quả phụ thuộc vào phần sụn của ổ đĩa hoặc DAS."
+          }
+        }
+      }
+    },
+    "Prevents automatic system sleep while this app is running. The display can still sleep, and you can still put your Mac to sleep manually." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Ngăn hệ thống tự động chuyển sang chế độ ngủ khi ứng dụng này đang chạy. Màn hình vẫn có thể ngủ và bạn vẫn có thể đưa máy Mac vào chế độ ngủ theo cách thủ công."
           }
         }
       }
@@ -149,11 +207,22 @@
       }
     },
     "Read-only drive" : {
+      "extractionState" : "stale",
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "Ổ đĩa chỉ đọc"
+          }
+        }
+      }
+    },
+    "Read-only drives" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Các ổ đĩa chỉ đọc"
           }
         }
       }
@@ -179,6 +248,7 @@
       }
     },
     "Write 30s · Scan 15s" : {
+      "extractionState" : "stale",
       "localizations" : {
         "vi" : {
           "stringUnit" : {
@@ -189,6 +259,7 @@
       }
     },
     "Write failed" : {
+      "extractionState" : "stale",
       "localizations" : {
         "vi" : {
           "stringUnit" : {

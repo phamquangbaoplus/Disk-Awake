@@ -3,7 +3,6 @@ name: Build DMG and release
 on:
   push:
     branches: [main]
-    tags: ['v*']
   workflow_dispatch:
 
 permissions:
@@ -33,18 +32,10 @@ jobs:
             OBJROOT="$RUNNER_TEMP/disk-awake-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
             CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
             CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" build
-      - name: Choose release name
+      - name: Generate release name
         id: release
-        env:
-          REF_TYPE: ${{ github.ref_type }}
-          REF_NAME: ${{ github.ref_name }}
         run: |
-          if [[ "$REF_TYPE" == tag ]]; then
-            tag="$REF_NAME"
-          else
-            tag="build-${GITHUB_RUN_NUMBER}-${GITHUB_SHA:0:7}"
-          fi
-          [[ "$tag" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || exit 1
+          tag="build-${GITHUB_RUN_NUMBER}-${GITHUB_SHA:0:7}"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
       - name: Package DMG
         env:
@@ -61,16 +52,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
-          REF_TYPE: ${{ github.ref_type }}
         run: |
-          options=()
-          if [[ "$REF_TYPE" != tag ]]; then
-            options+=(--prerelease --latest=false)
-          fi
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release upload "$RELEASE_TAG" dist/* --clobber
           else
             gh release create "$RELEASE_TAG" dist/* \
               --target "$GITHUB_SHA" --title "Disk Awake $RELEASE_TAG" \
-              --generate-notes "${options[@]}"
+              --generate-notes --latest
           fi

@@ -16,7 +16,8 @@ struct MountedDisk: Identifiable, Equatable, Sendable {
 // All filesystem work runs off the main actor. Descriptors are closed after
 // every pulse so the app does not retain an open file between intervals.
 actor DiskWorker {
-    func discover() -> [MountedDisk] {
+    func discover() throws -> [MountedDisk] {
+        try Task.checkCancellation()
         let keys: Set<URLResourceKey> = [
             .volumeIsLocalKey, .volumeIsInternalKey, .volumeIsReadOnlyKey,
             .volumeUUIDStringKey, .volumeNameKey
@@ -37,12 +38,14 @@ actor DiskWorker {
     }
 
     func pulse(_ disk: MountedDisk, filename: String) throws -> Bool {
+        try Task.checkCancellation()
 
         // Recheck mount identity immediately before opening. Never recreate a
         // missing mount path or follow a symlink to another filesystem.
-        guard discover().contains(where: { $0.id == disk.id && $0.url == disk.url }) else {
+        guard try discover().contains(where: { $0.id == disk.id && $0.url == disk.url }) else {
             throw CocoaError(.fileNoSuchFile)
         }
+        try Task.checkCancellation()
         let directory = open(disk.url.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
         guard directory >= 0 else { throw posixError() }
         defer { close(directory) }
@@ -52,6 +55,7 @@ actor DiskWorker {
               volumeInfo.f_flags & UInt32(MNT_ROOTFS) == 0 else {
             throw CocoaError(.fileWriteNoPermission)
         }
+        try Task.checkCancellation()
         let file = openat(directory, filename, O_WRONLY | O_CREAT | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK, 0o600)
         guard file >= 0 else { throw posixError() }
         defer { close(file) }
@@ -66,6 +70,7 @@ actor DiskWorker {
             guard let base = buffer.baseAddress else { throw CocoaError(.fileWriteUnknown) }
             var offset = 0
             while offset < buffer.count {
+                try Task.checkCancellation()
                 let count = pwrite(file, base.advanced(by: offset),
                                    buffer.count - offset, off_t(offset))
                 if count < 0 && errno == EINTR { continue }
@@ -73,6 +78,7 @@ actor DiskWorker {
                 offset += count
             }
         }
+        try Task.checkCancellation()
         guard ftruncate(file, 4096) == 0 else { throw posixError() }
         if fcntl(file, F_FULLFSYNC) == 0 { return true }
         guard fsync(file) == 0 else { throw posixError() }
@@ -86,20 +92,48 @@ actor DiskWorker {
 
 @MainActor
 @Observable
-final class DiskAwakeModel {
+final class DiskAwakeModel: NSObject {
     var disks: [MountedDisk] = []
     var enabled = UserDefaults.standard.object(forKey: "enabled") as? Bool ?? true {
-        didSet { UserDefaults.standard.set(enabled, forKey: "enabled") }
+        didSet {
+            UserDefaults.standard.set(enabled, forKey: "enabled")
+            needsTick = true
+            sleepTask?.cancel()
+        }
     }
+    // Session-only, independent of the periodic disk writes.
+    var keepMacAwake = false {
+        didSet { updateMacAwakeActivity() }
+    }
+    @ObservationIgnored private var macAwakeActivity: NSObjectProtocol?
+
+    private func updateMacAwakeActivity() {
+        if keepMacAwake && !suspendedForSystemSleep {
+            guard macAwakeActivity == nil else { return }
+            macAwakeActivity = ProcessInfo.processInfo.beginActivity(
+                options: [.idleSystemSleepDisabled],
+                reason: "Disk Awake: Keep Mac Awake"
+            )
+        } else if let macAwakeActivity {
+            ProcessInfo.processInfo.endActivity(macAwakeActivity)
+            self.macAwakeActivity = nil
+        }
+    }
+
+    @objc private func applicationWillTerminate() {
+        keepMacAwake = false
+    }
+
     private let pulseInterval: TimeInterval = 30
     private let scanInterval: TimeInterval = 15
     private var nextScan = Date.distantPast
-    private var excluded = Set(UserDefaults.standard.stringArray(forKey: "excluded") ?? [])
     private var lastAttempt: [String: Date] = [:]
     private(set) var writingDiskID: String?
     private var loop: Task<Void, Never>?
     private var sleepTask: Task<Void, Error>?
     private var needsTick = false
+    private var suspendedForSystemSleep = false
+    private var observingSleep = false
     private let worker = DiskWorker()
     private var activity: NSObjectProtocol?
     private let filename: String = {
@@ -110,18 +144,38 @@ final class DiskAwakeModel {
     }()
 
     func start() {
-        guard loop == nil else { return }
+        if !observingSleep {
+            let center = NSWorkspace.shared.notificationCenter
+            center.addObserver(self, selector: #selector(systemWillSleep),
+                               name: NSWorkspace.willSleepNotification, object: nil)
+            center.addObserver(self, selector: #selector(screensDidWake),
+                               name: NSWorkspace.screensDidWakeNotification, object: nil)
+            NotificationCenter.default.addObserver(
+                self, selector: #selector(applicationWillTerminate),
+                name: NSApplication.willTerminateNotification, object: nil
+            )
+            observingSleep = true
+        }
+        guard loop == nil, !suspendedForSystemSleep else { return }
         loop = Task { [weak self] in
+            defer {
+                self?.loop = nil
+                // A screen wake may arrive while a cancelled disk operation unwinds.
+                if let self, !self.suspendedForSystemSleep, Task.isCancelled {
+                    self.start()
+                }
+            }
             while !Task.isCancelled {
                 guard let self else { return }
                 self.needsTick = false
                 await self.tick()
+                guard !Task.isCancelled, !self.suspendedForSystemSleep else { return }
                 if self.needsTick { continue }
                 // Wake at the next scan or write deadline, independently.
                 // A scan must never round a pending write up to another 15 seconds.
                 var deadline = self.nextScan
                 if self.enabled {
-                    for disk in self.disks where disk.writable && self.isSelected(disk) {
+                    for disk in self.disks where disk.writable {
                         let due = (self.lastAttempt[disk.id] ?? .distantPast)
                             .addingTimeInterval(self.pulseInterval)
                         deadline = min(deadline, due)
@@ -139,24 +193,40 @@ final class DiskAwakeModel {
         }
     }
 
-    func isSelected(_ disk: MountedDisk) -> Bool { !excluded.contains(disk.id) }
+    @objc private func systemWillSleep() {
+        suspendedForSystemSleep = true
+        updateMacAwakeActivity()
+        loop?.cancel()
+        sleepTask?.cancel()
+        if let activity {
+            ProcessInfo.processInfo.endActivity(activity)
+            self.activity = nil
+        }
+    }
+
+    @objc private func screensDidWake() {
+        guard suspendedForSystemSleep else { return }
+        // Deliberately do not resume on didWakeNotification: background wakes
+        // must not restart disk I/O. Wait for the display to wake instead.
+        suspendedForSystemSleep = false
+        updateMacAwakeActivity()
+        nextScan = .distantPast
+        let now = Date()
+        for disk in disks {
+            lastAttempt[disk.id] = now
+        }
+        start()
+    }
 
     func nextWriteDate(for disk: MountedDisk) -> Date? {
-        guard enabled, disk.writable, isSelected(disk),
+        guard !suspendedForSystemSleep, enabled, disk.writable,
               let attempt = lastAttempt[disk.id] else { return nil }
         return attempt.addingTimeInterval(pulseInterval)
     }
 
-    func select(_ disk: MountedDisk, enabled: Bool) {
-        if enabled { excluded.remove(disk.id) } else { excluded.insert(disk.id) }
-        UserDefaults.standard.set(Array(excluded), forKey: "excluded")
-        lastAttempt[disk.id] = nil
-        needsTick = true
-        sleepTask?.cancel()
-    }
-
     private func refreshDisks() async {
-        let mounted = await worker.discover()
+        guard let mounted = try? await worker.discover(),
+              !Task.isCancelled, !suspendedForSystemSleep else { return }
         disks = mounted.map { disk in
             var updated = disk
             if let previous = disks.first(where: { $0.id == disk.id && $0.url == disk.url }) {
@@ -171,11 +241,13 @@ final class DiskAwakeModel {
     }
 
     private func tick() async {
+        guard !Task.isCancelled, !suspendedForSystemSleep else { return }
         if Date() >= nextScan {
             await refreshDisks()
             nextScan = Date().addingTimeInterval(scanInterval)
         }
-        let active = enabled && disks.contains { isSelected($0) && $0.writable }
+        guard !Task.isCancelled, !suspendedForSystemSleep else { return }
+        let active = enabled && disks.contains { $0.writable }
         if active && activity == nil {
             // Disable App Nap, but allow the Mac itself to sleep normally.
             activity = ProcessInfo.processInfo.beginActivity(
@@ -187,8 +259,9 @@ final class DiskAwakeModel {
             self.activity = nil
         }
         guard enabled else { return }
-        for disk in disks where disk.writable && isSelected(disk) {
-            guard enabled, isSelected(disk) else { continue }
+        for disk in disks where disk.writable {
+            guard !Task.isCancelled, !suspendedForSystemSleep else { return }
+            guard enabled else { return }
             if let previous = lastAttempt[disk.id],
                Date().timeIntervalSince(previous) < pulseInterval { continue }
             lastAttempt[disk.id] = Date()
@@ -205,6 +278,8 @@ final class DiskAwakeModel {
                         ? String(localized: "Written and synced to the drive")
                         : String(localized: "Written; the drive only supports fsync")
                 }
+            } catch is CancellationError {
+                return
             } catch {
                 if let index = disks.firstIndex(where: { $0.id == disk.id }) {
                     let nsError = error as NSError

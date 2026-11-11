@@ -6,146 +6,76 @@ struct ContentView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            AwakeHeader(enabled: $model.enabled)
+            AwakeHeader(model: model)
             Divider()
-            DiskList(model: model)
+            Toggle(isOn: $model.keepMacAwake) {
+                Label("Keep Mac Awake", systemImage: "cup.and.saucer")
+            }
+            .toggleStyle(.switch)
+            .controlSize(.small)
+            .help("Prevents automatic system sleep while this app is running. The display can still sleep, and you can still put your Mac to sleep manually.")
+            Toggle(isOn: $model.enabled) {
+                Label("Keep All External Drives Awake", systemImage: "externaldrive")
+            }
+            .toggleStyle(.switch)
+            .controlSize(.small)
             Divider()
-            AwakeFooter()
+            AwakeFooter(model: model)
         }
         .padding(16)
-        .frame(width: 400)
+        .frame(width: 320)
         .fixedSize(horizontal: false, vertical: true)
     }
 }
 
 private struct AwakeHeader: View {
-    @Binding var enabled: Bool
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "externaldrive.badge.checkmark")
-                .font(.title)
-                .foregroundStyle(.tint)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Disk Awake").font(.title2.bold())
-                Text(enabled ? LocalizedStringResource("Keep awake every 30 seconds") : LocalizedStringResource("Paused"))
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            Toggle("Keep Drives Awake", isOn: $enabled)
-                .labelsHidden()
-                .toggleStyle(.switch)
-        }
-    }
-}
-
-private struct DiskList: View {
     let model: DiskAwakeModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("External Drives").font(.headline)
-                Spacer()
+        HStack(spacing: 10) {
+            Image(systemName: "externaldrive.badge.checkmark")
+                .font(.title2)
+                .foregroundStyle(.tint)
+                .accessibilityHidden(true)
+            Text("Disk Awake").font(.headline)
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 3) {
                 Text("\(model.disks.count) connected")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            if model.disks.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "externaldrive.badge.plus")
-                        .font(.title)
-                    Text("Connect a drive to get started")
-                        .font(.callout)
+                if !model.enabled {
+                    Text("Paused")
+                } else if model.disks.isEmpty {
+                    Text("No external drives")
+                } else if !model.disks.contains(where: { $0.writable }) {
+                    Text("Read-only drives")
+                } else {
+                    WriteCountdown(
+                        nextWrite: model.disks.compactMap { model.nextWriteDate(for: $0) }.min(),
+                        isWriting: model.writingDiskID != nil
+                    )
                 }
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 24)
-            } else {
-                // Give the scroll region a real height in the menu bar window.
-                ScrollView {
-                    VStack(spacing: 10) {
-                        ForEach(model.disks) { disk in
-                            DiskRow(model: model, disk: disk)
-                        }
-                    }
-                }
-                .frame(height: min(CGFloat(model.disks.count) * 82, 300))
             }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .monospacedDigit()
         }
     }
 }
 
 private struct AwakeFooter: View {
+    let model: DiskAwakeModel
+
     var body: some View {
         HStack(spacing: 8) {
-            Text("Write 30s · Scan 15s")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Image(systemName: "info.circle")
-                .foregroundStyle(.secondary)
-                .help("Pauses when your Mac sleeps and resumes when it wakes. Every 30 seconds, writes and syncs 4 KB to a hidden file on each selected drive. Effectiveness depends on the drive or DAS firmware.")
-                .accessibilityLabel("How Disk Awake works")
-            Spacer()
             Button("Quit") { NSApp.terminate(nil) }
                 .controlSize(.small)
-        }
-    }
-}
-
-private struct DiskRow: View {
-    let model: DiskAwakeModel
-    let disk: MountedDisk
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Toggle(isOn: Binding(
-                get: { model.isSelected(disk) },
-                set: { model.select(disk, enabled: $0) }
-            )) {
-                Label(disk.name, systemImage: "externaldrive")
-                    .font(.headline)
-                    .lineLimit(1)
-                    .help(disk.url.path)
-            }
-            .toggleStyle(.switch)
-            .controlSize(.small)
-            .disabled(!disk.writable)
-
-            if !disk.writable {
-                Label("Read-only drive", systemImage: "lock")
-                    .foregroundStyle(.secondary)
-            } else if !model.enabled || !model.isSelected(disk) {
-                Text("Paused")
-                    .foregroundStyle(.secondary)
-            } else {
-                HStack {
-                    if disk.hasWriteError {
-                        Label("Write failed", systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.orange)
-                            .help(disk.message)
-                    } else if let date = disk.lastSuccess {
-                        Text("Last write \(date.formatted(date: .omitted, time: .standard))")
-                            .foregroundStyle(.secondary)
-                            .help(disk.message)
-                    } else {
-                        Text("No writes yet").foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 8)
-                    WriteCountdown(
-                        nextWrite: model.nextWriteDate(for: disk),
-                        isWriting: model.writingDiskID == disk.id
-                    )
-                }
-                .monospacedDigit()
+            Spacer()
+            let errorCount = model.disks.filter { $0.hasWriteError }.count
+            if errorCount > 0 {
+                Label("\(errorCount) write errors", systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
             }
         }
-        .font(.caption)
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
     }
 }
 
@@ -160,7 +90,7 @@ private struct WriteCountdown: View {
             TimelineView(.periodic(from: nextWrite.addingTimeInterval(-30), by: 1)) { context in
                 let seconds = max(0, Int(ceil(nextWrite.timeIntervalSince(context.date))))
                 if seconds > 0 {
-                    Text("Write in \(seconds)s").foregroundStyle(.white)
+                    Text("Write in \(seconds)s").foregroundStyle(.secondary)
                 } else {
                     Text("Waiting…").foregroundStyle(.secondary)
                 }
