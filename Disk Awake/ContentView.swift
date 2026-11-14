@@ -14,6 +14,7 @@ struct ContentView: View {
             .toggleStyle(.switch)
             .controlSize(.small)
             .help("Prevents automatic system sleep while this app is running. The display can still sleep, and you can still put your Mac to sleep manually.")
+            JellyfinAwakeToggle(controller: model.jellyfin)
             Toggle(isOn: $model.enabled) {
                 Label("Keep All External Drives Awake", systemImage: "externaldrive")
             }
@@ -98,5 +99,18 @@ private struct WriteCountdown: View {
         } else {
             Text("Waiting…").foregroundStyle(.secondary)
         }
+    }
+}
+
+private struct JellyfinAwakeToggle: View {
+    @Bindable var controller: JellyfinAwakeController
+
+    var body: some View {
+        Toggle(isOn: $controller.enabled) {
+            Label("Keep Mac Awake for Jellyfin", systemImage: "play.tv")
+        }
+        .toggleStyle(.switch)
+        .controlSize(.small)
+        .help("Keeps the Mac awake for 5 minutes after waking and while TCP port 8096 has established connections. Allows sleep 5 minutes after the last connection. Dark Wake requires AC power and Wake for network access.")
     }
 }

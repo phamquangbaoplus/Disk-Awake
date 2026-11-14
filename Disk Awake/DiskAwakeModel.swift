@@ -93,6 +93,8 @@ actor DiskWorker {
 @MainActor
 @Observable
 final class DiskAwakeModel: NSObject {
+    let debugLog = WakeDebugLog()
+    let jellyfin = JellyfinAwakeController()
     var disks: [MountedDisk] = []
     var enabled = UserDefaults.standard.object(forKey: "enabled") as? Bool ?? true {
         didSet {
@@ -103,7 +105,10 @@ final class DiskAwakeModel: NSObject {
     }
     // Session-only, independent of the periodic disk writes.
     var keepMacAwake = false {
-        didSet { updateMacAwakeActivity() }
+        didSet {
+            debugLog.record("KEEP_MAC_AWAKE enabled=\(keepMacAwake)")
+            updateMacAwakeActivity()
+        }
     }
     @ObservationIgnored private var macAwakeActivity: NSObjectProtocol?
 
@@ -121,7 +126,18 @@ final class DiskAwakeModel: NSObject {
     }
 
     @objc private func applicationWillTerminate() {
+        // Prevent a cancelled loop from restarting while the app exits.
+        suspendedForSystemSleep = true
+        loop?.cancel()
+        sleepTask?.cancel()
+        if let activity {
+            ProcessInfo.processInfo.endActivity(activity)
+            self.activity = nil
+        }
         keepMacAwake = false
+        jellyfin.stop()
+        debugLog.record("APPLICATION_TERMINATING")
+        debugLog.stop()
     }
 
     private let pulseInterval: TimeInterval = 30
@@ -144,6 +160,9 @@ final class DiskAwakeModel: NSObject {
     }()
 
     func start() {
+        jellyfin.debugLog = debugLog
+        debugLog.start()
+        jellyfin.start()
         if !observingSleep {
             let center = NSWorkspace.shared.notificationCenter
             center.addObserver(self, selector: #selector(systemWillSleep),
@@ -271,7 +290,8 @@ final class DiskAwakeModel: NSObject {
                 let fullSync = try await worker.pulse(
                     disk, filename: filename
                 )
-                if let index = disks.firstIndex(where: { $0.id == disk.id }) {
+                guard !Task.isCancelled, !suspendedForSystemSleep else { return }
+                if let index = disks.firstIndex(where: { $0.id == disk.id && $0.url == disk.url }) {
                     disks[index].lastSuccess = Date()
                     disks[index].hasWriteError = false
                     disks[index].message = fullSync
@@ -281,7 +301,8 @@ final class DiskAwakeModel: NSObject {
             } catch is CancellationError {
                 return
             } catch {
-                if let index = disks.firstIndex(where: { $0.id == disk.id }) {
+                guard !Task.isCancelled, !suspendedForSystemSleep else { return }
+                if let index = disks.firstIndex(where: { $0.id == disk.id && $0.url == disk.url }) {
                     let nsError = error as NSError
                     disks[index].hasWriteError = true
                     disks[index].message = String(localized: "Error: Could not write to the drive (\(nsError.domain), code \(nsError.code)).", comment: "Write failure; first value is the error domain, second is the error code.")
