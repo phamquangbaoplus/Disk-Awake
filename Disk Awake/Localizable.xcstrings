@@ -21,6 +21,9 @@
         }
       }
     },
+    "Cannot inspect TCP 8096 connections" : {
+
+    },
     "Connect a drive to get started" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -31,6 +34,15 @@
           }
         }
       }
+    },
+    "Could not keep Mac awake for Jellyfin" : {
+
+    },
+    "Could not register for Dark Wake notifications." : {
+
+    },
+    "Dark Wake monitoring is unavailable on this macOS version." : {
+
     },
     "Disk Awake" : {
       "localizations" : {
@@ -80,6 +92,9 @@
           }
         }
       }
+    },
+    "Jellyfin connected — keeping Mac awake" : {
+
     },
     "Keep All External Drives Awake" : {
       "localizations" : {
@@ -133,6 +148,15 @@
         }
       }
     },
+    "Keep Mac Awake for Jellyfin" : {
+
+    },
+    "Keeping Mac awake for Jellyfin — 5-minute grace period" : {
+
+    },
+    "Keeps the Mac awake for 5 minutes after waking and while TCP port 8096 has established connections. Allows sleep 5 minutes after the last connection. Dark Wake requires AC power and Wake for network access." : {
+
+    },
     "Last write %@" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -153,6 +177,9 @@
           }
         }
       }
+    },
+    "No Jellyfin connections — system sleep allowed" : {
+
     },
     "No writes yet" : {
       "extractionState" : "stale",
@@ -226,6 +253,12 @@
           }
         }
       }
+    },
+    "Waiting for Jellyfin" : {
+
+    },
+    "Waiting for Mac to wake" : {
+
     },
     "Waiting for the first write" : {
       "localizations" : {
