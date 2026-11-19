@@ -22,16 +22,44 @@
       }
     },
     "Cannot inspect Jellyfin connections — keeping Mac awake" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Không thể kiểm tra các kết nối Jellyfin – đang giữ máy Mac hoạt động"
+          }
+        }
+      }
     },
     "Could not keep Mac awake for Jellyfin" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Không thể giữ máy Mac hoạt động cho Jellyfin"
+          }
+        }
+      }
     },
     "Could not register for Dark Wake notifications." : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Không thể đăng ký nhận thông báo Dark Wake."
+          }
+        }
+      }
     },
     "Dark Wake monitoring is unavailable on this macOS version." : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Tính năng theo dõi Dark Wake không khả dụng trên phiên bản macOS này."
+          }
+        }
+      }
     },
     "Disk Awake" : {
       "localizations" : {
@@ -61,7 +89,14 @@
       }
     },
     "Jellyfin connected — keeping Mac awake" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Jellyfin đã kết nối – đang giữ máy Mac hoạt động"
+          }
+        }
+      }
     },
     "Keep All External Drives Awake" : {
       "localizations" : {
@@ -94,13 +129,34 @@
       }
     },
     "Keep Mac Awake for Jellyfin" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Giữ máy Mac hoạt động cho Jellyfin"
+          }
+        }
+      }
     },
     "Keeping Mac awake for Jellyfin — 15-minute grace period" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Đang giữ máy Mac hoạt động cho Jellyfin – thời gian chờ 15 phút"
+          }
+        }
+      }
     },
     "Keeps the Mac awake for 15 minutes after waking and while TCP port 8096 has established connections. Allows sleep 15 minutes after the last connection. If connection detection fails, keeps the Mac awake until detection recovers or you turn this off. Dark Wake requires AC power and Wake for network access." : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Giữ máy Mac hoạt động trong 15 phút sau khi thức dậy và khi cổng TCP 8096 có các kết nối đã thiết lập. Cho phép máy chuyển sang chế độ ngủ 15 phút sau khi kết nối cuối cùng kết thúc. Nếu không thể phát hiện kết nối, máy Mac sẽ tiếp tục hoạt động cho đến khi tính năng phát hiện khôi phục hoặc bạn tắt tùy chọn này. Dark Wake yêu cầu nguồn điện AC và tính năng Đánh thức để truy cập mạng."
+          }
+        }
+      }
     },
     "No external drives" : {
       "localizations" : {
@@ -113,7 +169,14 @@
       }
     },
     "No Jellyfin connections — system sleep allowed" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Không có kết nối Jellyfin – hệ thống có thể chuyển sang chế độ ngủ"
+          }
+        }
+      }
     },
     "Paused" : {
       "localizations" : {
@@ -156,10 +219,24 @@
       }
     },
     "Waiting for Jellyfin" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Đang chờ Jellyfin"
+          }
+        }
+      }
     },
     "Waiting for Mac to wake" : {
-
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Đang chờ máy Mac thức dậy"
+          }
+        }
+      }
     },
     "Waiting for the first write" : {
       "localizations" : {

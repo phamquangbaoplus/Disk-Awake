@@ -111,6 +111,6 @@ private struct JellyfinAwakeToggle: View {
         }
         .toggleStyle(.switch)
         .controlSize(.small)
-        .help("Keeps the Mac awake for 5 minutes after waking and while TCP port 8096 has established connections. Allows sleep 5 minutes after the last connection. Dark Wake requires AC power and Wake for network access.")
+        .help("Keeps the Mac awake for 15 minutes after waking and while TCP port 8096 has established connections. Allows sleep 15 minutes after the last connection. If connection detection fails, keeps the Mac awake until detection recovers or you turn this off. Dark Wake requires AC power and Wake for network access.")
     }
 }

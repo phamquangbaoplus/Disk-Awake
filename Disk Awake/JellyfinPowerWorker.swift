@@ -7,11 +7,14 @@ import Darwin
 nonisolated struct JellyfinConnectionScanner {
     enum ScanError: LocalizedError {
         case commandFailed(Int32)
+        case invalidOutput
 
         var errorDescription: String? {
             switch self {
             case .commandFailed(let status):
                 "netstat failed or was terminated (exit status \(status))."
+            case .invalidOutput:
+                "netstat did not return a readable TCP connection table."
             }
         }
     }
@@ -23,7 +26,8 @@ nonisolated struct JellyfinConnectionScanner {
         process.arguments = ["-an", "-p", "tcp"]
         process.environment = ["LC_ALL": "C", "PATH": "/usr/bin:/usr/sbin:/bin:/sbin"]
         process.standardOutput = output
-        process.standardError = FileHandle.nullDevice
+        // Some netstat failures report an error but still exit successfully.
+        process.standardError = output
         try process.run()
         let timeout = DispatchWorkItem {
             if process.isRunning { process.terminate() }
@@ -35,14 +39,24 @@ nonisolated struct JellyfinConnectionScanner {
         guard process.terminationStatus == 0 else {
             throw ScanError.commandFailed(process.terminationStatus)
         }
-        return Self.containsConnection(String(decoding: data, as: UTF8.self))
+        return try Self.connectionState(from: String(decoding: data, as: UTF8.self))
+    }
+
+    nonisolated static func connectionState(from output: String) throws -> Bool {
+        // Unknown is not disconnected: never allow sleep based on an empty
+        // response, a permission error, or an unsupported output format.
+        guard !output.contains("netstat:"),
+              output.split(whereSeparator: \.isNewline).contains(where: {
+                  $0.contains("Proto") && $0.contains("Local Address") && $0.contains("Foreign Address")
+              }) else { throw ScanError.invalidOutput }
+        return containsConnection(output)
     }
 
     nonisolated static func containsConnection(_ output: String) -> Bool {
         output.split(whereSeparator: \.isNewline).contains { line in
             let fields = line.split(whereSeparator: \.isWhitespace)
             guard fields.count >= 6,
-                  fields[0] == "tcp4" || fields[0] == "tcp6",
+                  fields[0] == "tcp4" || fields[0] == "tcp6" || fields[0] == "tcp46",
                   fields[5] == "ESTABLISHED" else { return false }
             // Match the LOCAL port only; outgoing connections to another
             // server's 8096 must not keep this Mac awake.
@@ -215,16 +229,15 @@ nonisolated final class JellyfinPowerWorker: @unchecked Sendable {
     }
 
     private func grantGrace(reason: String) {
-        deadline = .now.advanced(by: .seconds(300))
+        deadline = .now.advanced(by: .seconds(900))
         updateAssertion()
         if reason != "tcp" {
-            log("WAKE_GRACE reason=\(reason) seconds=300 assertionID=\(assertion) displayWakeRequested=false")
+            log("WAKE_GRACE reason=\(reason) seconds=900 assertionID=\(assertion) displayWakeRequested=false")
         }
     }
 
     private func tick() {
         guard running, cpuAvailable else { return }
-        updateAssertion()
         guard !scanInFlight else { return }
         scanInFlight = true
         let session = generation
@@ -235,16 +248,25 @@ nonisolated final class JellyfinPowerWorker: @unchecked Sendable {
                 guard running, cpuAvailable, generation == session else { return }
                 switch result {
                 case .success(let connected):
-                    if connected { grantGrace(reason: "tcp") }
+                    if connected {
+                        grantGrace(reason: "tcp")
+                    } else {
+                        updateAssertion()
+                    }
                     snapshot("TCP_SCAN established=\(connected) assertionID=\(assertion)")
                     if assertion != 0 {
                         report(connected
                             ? "Jellyfin connected — keeping Mac awake"
-                            : "Keeping Mac awake for Jellyfin — 5-minute grace period")
+                            : "Keeping Mac awake for Jellyfin — 15-minute grace period")
                     }
                 case .failure(let error):
                     snapshot("TCP_SCAN_FAILED \(error.localizedDescription)")
-                    report("Cannot inspect TCP 8096 connections")
+                    // Preserve protection while detection is unavailable. Only a
+                    // successful scan may conclude that clients disconnected.
+                    grantGrace(reason: "scanFailed")
+                    if assertion != 0 {
+                        report("Cannot inspect Jellyfin connections — keeping Mac awake")
+                    }
                 }
             }
         }
@@ -282,7 +304,7 @@ nonisolated final class JellyfinPowerWorker: @unchecked Sendable {
         let result = IOPMAssertionCreateWithProperties(properties as CFDictionary, &assertion)
         log("ASSERTION_CREATE id=\(assertion) result=\(result) seconds=\(seconds) displayWakeRequested=false")
         if result == 0 {
-            report("Keeping Mac awake for Jellyfin — 5-minute grace period")
+            report("Keeping Mac awake for Jellyfin — 15-minute grace period")
         } else {
             assertion = 0
             report("Could not keep Mac awake for Jellyfin")
