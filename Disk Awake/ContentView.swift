@@ -5,33 +5,109 @@ struct ContentView: View {
     @Bindable var model: DiskAwakeModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            AwakeHeader(model: model)
-            Divider()
-            Toggle(isOn: $model.keepMacAwake) {
-                Label("Keep Mac Awake", systemImage: "cup.and.saucer")
+        VStack(alignment: .leading, spacing: 14) {
+            AwakeHeader()
+
+            ControlSection(
+                "Mac",
+                systemImage: "desktopcomputer",
+                headerTrailing: { EmptyView() }
+            ) {
+                AwakeToggleRow(
+                    "Keep Mac Awake",
+                    isOn: $model.keepMacAwake
+                )
+                .help("Prevents automatic system sleep while this app is running. The display can still sleep, and you can still put your Mac to sleep manually.")
+
+                Divider().opacity(0.6)
+                JellyfinAwakeToggle(controller: model.jellyfin)
             }
-            .toggleStyle(.switch)
-            .controlSize(.small)
-            .help("Prevents automatic system sleep while this app is running. The display can still sleep, and you can still put your Mac to sleep manually.")
-            JellyfinAwakeToggle(controller: model.jellyfin)
-            Toggle(isOn: $model.enabled) {
-                Label("Keep All External Drives Awake", systemImage: "externaldrive")
+
+            ControlSection(
+                "External Drives",
+                systemImage: "externaldrive",
+                headerTrailing: { DriveSectionStatus(model: model) }
+            ) {
+                AwakeToggleRow(
+                    "Keep External Drives Awake",
+                    isOn: $model.enabled
+                )
+
+                Divider().opacity(0.6)
+                JellyfinDriveAwakeSection(
+                    controller: model.jellyfinDrives,
+                    activity: model.jellyfinActivity
+                )
             }
-            .toggleStyle(.switch)
-            .controlSize(.small)
+
             Divider()
             AwakeFooter(model: model)
         }
         .padding(16)
-        .frame(width: 320)
+        .frame(width: 460)
         .fixedSize(horizontal: false, vertical: true)
     }
 }
 
-private struct AwakeHeader: View {
-    let model: DiskAwakeModel
+private struct ControlSection<HeaderTrailing: View, Content: View>: View {
+    let title: LocalizedStringKey
+    let systemImage: String
+    @ViewBuilder let headerTrailing: HeaderTrailing
+    @ViewBuilder let content: Content
 
+    init(
+        _ title: LocalizedStringKey,
+        systemImage: String,
+        @ViewBuilder headerTrailing: () -> HeaderTrailing,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.systemImage = systemImage
+        self.headerTrailing = headerTrailing()
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Label(title, systemImage: systemImage)
+                    .font(.caption.weight(.semibold))
+                Spacer(minLength: 8)
+                headerTrailing
+            }
+            .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 10) {
+                content
+            }
+            .padding(12)
+            .background(.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        }
+    }
+}
+
+private struct AwakeToggleRow: View {
+    let title: LocalizedStringKey
+    @Binding var isOn: Bool
+
+    init(_ title: LocalizedStringKey, isOn: Binding<Bool>) {
+        self.title = title
+        _isOn = isOn
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(title)
+                .lineLimit(1)
+            Spacer(minLength: 12)
+            Toggle(title, isOn: $isOn)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
+        }
+    }
+}
+
+private struct AwakeHeader: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "externaldrive.badge.checkmark")
@@ -39,31 +115,73 @@ private struct AwakeHeader: View {
                 .foregroundStyle(.tint)
                 .accessibilityHidden(true)
             Text("Disk Awake").font(.headline)
-            Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 3) {
-                Text("\(model.disks.count) connected")
-                if !model.enabled {
-                    Text("Paused")
-                } else if model.disks.isEmpty {
-                    Text("No external drives")
-                } else if !model.disks.contains(where: { $0.writable }) {
-                    Text("Read-only drives")
-                } else {
-                    WriteCountdown(
-                        nextWrite: model.disks.compactMap { model.nextWriteDate(for: $0) }.min(),
-                        isWriting: model.writingDiskID != nil
-                    )
+        }
+    }
+}
+
+private struct DriveSectionStatus: View {
+    let model: DiskAwakeModel
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text("\(model.disks.count) drives")
+            Text("•").foregroundStyle(.tertiary)
+            if !model.drivesShouldBeKeptAwake {
+                Text("Paused")
+            } else if model.disks.isEmpty {
+                Text("No external drives")
+            } else if !model.disks.contains(where: { $0.writable }) {
+                Text("Read-only drives")
+            } else {
+                WriteCountdown(
+                    nextWrite: model.disks.compactMap { model.nextWriteDate(for: $0) }.min(),
+                    isWriting: model.writingDiskID != nil
+                )
+            }
+        }
+        .font(.caption)
+        .monospacedDigit()
+    }
+}
+
+private struct JellyfinDriveAwakeSection: View {
+    @Bindable var controller: JellyfinDriveAwakeController
+    @Bindable var activity: JellyfinActivityMonitor
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            AwakeToggleRow(
+                "Keep External Drives Awake for Jellyfin",
+                isOn: $controller.enabled
+            )
+            .help("Checks Jellyfin every 15 seconds. When a client is connected or playing, all writable external drives stay active for 5 minutes.")
+
+            if controller.enabled {
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    HStack(spacing: 6) {
+                        Text(activity.status)
+                            .lineLimit(1)
+                        Spacer(minLength: 8)
+                        if activity.isChecking {
+                            ProgressView().controlSize(.mini)
+                        }
+                        if let deadline = activity.keepAwakeUntil, deadline > context.date {
+                            let seconds = max(0, Int(ceil(deadline.timeIntervalSince(context.date))))
+                            Text("\(seconds / 60):\(String(format: "%02d", seconds % 60)) left")
+                                .monospacedDigit()
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .monospacedDigit()
         }
     }
 }
 
 private struct AwakeFooter: View {
     let model: DiskAwakeModel
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         HStack(spacing: 8) {
@@ -76,7 +194,51 @@ private struct AwakeFooter: View {
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
+            Button {
+                NSApp.activate(ignoringOtherApps: true)
+                openSettings()
+            } label: {
+                Label("Settings", systemImage: "gearshape")
+            }
+            .controlSize(.small)
         }
+    }
+}
+
+struct JellyfinSettingsView: View {
+    @Bindable var activity: JellyfinActivityMonitor
+    @State private var apiKey = ""
+    @State private var saved = false
+
+    var body: some View {
+        Form {
+            Section("Jellyfin") {
+                LabeledContent("Server") {
+                    Text("localhost:8096")
+                        .foregroundStyle(.secondary)
+                }
+                TextField("API key", text: $apiKey)
+                    .textFieldStyle(.roundedBorder)
+                HStack {
+                    Button("Save") {
+                        activity.updateConfiguration(apiKey: apiKey)
+                        saved = true
+                    }
+                    .disabled(apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    if saved {
+                        Label("Saved", systemImage: "checkmark.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    }
+                    Spacer()
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .padding(12)
+        .frame(width: 420)
+        .onAppear { apiKey = activity.apiKey }
+        .onChange(of: apiKey) { _, _ in saved = false }
     }
 }
 
@@ -106,11 +268,18 @@ private struct JellyfinAwakeToggle: View {
     @Bindable var controller: JellyfinAwakeController
 
     var body: some View {
-        Toggle(isOn: $controller.enabled) {
-            Label("Keep Mac Awake for Jellyfin", systemImage: "play.tv")
+        VStack(alignment: .leading, spacing: 7) {
+            AwakeToggleRow(
+                "Keep Mac Awake for Jellyfin",
+                isOn: $controller.enabled
+            )
+            if controller.enabled {
+                Text(controller.status)
+                    .lineLimit(1)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
         }
-        .toggleStyle(.switch)
-        .controlSize(.small)
-        .help("Keeps the Mac awake for 15 minutes after waking and while TCP port 8096 has established connections. Allows sleep 15 minutes after the last connection. If connection detection fails, keeps the Mac awake until detection recovers or you turn this off. Dark Wake requires AC power and Wake for network access.")
+        .help("Uses the shared Jellyfin API monitor to keep the Mac awake while a session is active and for 5 minutes afterward. TCP port 8096 is checked only during wake/bootstrap or when the API is unavailable. Dark Wake requires AC power and Wake for network access.")
     }
 }

@@ -115,12 +115,15 @@ nonisolated final class JellyfinPowerWorker: @unchecked Sendable {
     private let queue = DispatchQueue(label: "DiskAwake.power", qos: .userInitiated)
     private let scanQueue = DispatchQueue(label: "DiskAwake.tcp", qos: .utility)
     private let report: @Sendable (LocalizedStringResource) -> Void
+    private let requestActivityRefresh: @Sendable () -> Void
     private var api: PowerConnectionAPI?
     private var connection: OpaquePointer?
     private var timer: DispatchSourceTimer?
     private var activity: NSObjectProtocol?
     private var assertion: IOPMAssertionID = 0
-    private var deadline: ContinuousClock.Instant?
+    private var apiDeadline: ContinuousClock.Instant?
+    private var bootstrapDeadline: ContinuousClock.Instant?
+    private var apiConfirmedAfterWake = false
     private var running = false
     private var cpuAvailable = true
     private var scanInFlight = false
@@ -128,8 +131,12 @@ nonisolated final class JellyfinPowerWorker: @unchecked Sendable {
     private var lastSnapshot = ""
     private var lastLogTime = ContinuousClock.now
 
-    init(report: @escaping @Sendable (LocalizedStringResource) -> Void) {
+    init(
+        report: @escaping @Sendable (LocalizedStringResource) -> Void,
+        requestActivityRefresh: @escaping @Sendable () -> Void
+    ) {
         self.report = report
+        self.requestActivityRefresh = requestActivityRefresh
     }
 
     func start() {
@@ -171,7 +178,7 @@ nonisolated final class JellyfinPowerWorker: @unchecked Sendable {
             )
             api.setQueue(newConnection, queue)
             log("POWER_REGISTERED interests=CPU,Video,Audio,Network,Disk queue=background capabilities=\(api.capabilities())")
-            if cpuAvailable { grantGrace(reason: "enabled") }
+            if cpuAvailable { beginBootstrap(reason: "enabled") }
             let timer = DispatchSource.makeTimerSource(queue: queue)
             timer.schedule(deadline: .now(), repeating: .seconds(5), leeway: .milliseconds(100))
             timer.setEventHandler { [weak self] in self?.tick() }
@@ -192,7 +199,9 @@ nonisolated final class JellyfinPowerWorker: @unchecked Sendable {
                 _ = api.release(connection)
             }
             connection = nil
-            deadline = nil
+            apiDeadline = nil
+            bootstrapDeadline = nil
+            apiConfirmedAfterWake = false
             releaseAssertion()
             if let activity {
                 ProcessInfo.processInfo.endActivity(activity)
@@ -217,27 +226,61 @@ nonisolated final class JellyfinPowerWorker: @unchecked Sendable {
         log("POWER_EVENT capabilities=\(capabilities) cpu=\(cpuAvailable) video=\(hasVideo) network=\(capabilities & 8 != 0) mainThread=\(Thread.isMainThread)")
         if !cpuAvailable {
             generation += 1
-            deadline = nil
+            apiDeadline = nil
+            bootstrapDeadline = nil
+            apiConfirmedAfterWake = false
             releaseAssertion()
             report("Waiting for Mac to wake")
         } else if !hadCPU {
             generation += 1
             // Take the assertion synchronously BEFORE acknowledging the wake.
             // Never dispatch this critical work to AppKit's main run loop.
-            grantGrace(reason: hasVideo ? "fullWake" : "darkWake")
+            beginBootstrap(reason: hasVideo ? "fullWake" : "darkWake")
         }
     }
 
-    private func grantGrace(reason: String) {
-        deadline = .now.advanced(by: .seconds(900))
+    func updateJellyfinActivity(
+        graceRemaining: TimeInterval?,
+        apiCheckSucceeded: Bool
+    ) {
+        queue.async { [self] in
+            guard running else { return }
+            if let graceRemaining, graceRemaining > 0 {
+                apiDeadline = .now.advanced(by: .seconds(graceRemaining))
+            } else {
+                apiDeadline = nil
+            }
+            let wasConfirmed = apiConfirmedAfterWake
+            apiConfirmedAfterWake = apiCheckSucceeded
+            if !apiCheckSucceeded, wasConfirmed, cpuAvailable {
+                extendBootstrap(reason: "apiUnavailable")
+            } else {
+                updateAssertion()
+            }
+            snapshot("API_STATE success=\(apiCheckSucceeded) grace=\(graceRemaining ?? 0) assertionID=\(assertion)")
+        }
+    }
+
+    private func beginBootstrap(reason: String) {
+        apiConfirmedAfterWake = false
+        extendBootstrap(reason: reason)
+        requestActivityRefresh()
+    }
+
+    private func extendBootstrap(reason: String) {
+        bootstrapDeadline = .now.advanced(by: .seconds(300))
         updateAssertion()
         if reason != "tcp" {
-            log("WAKE_GRACE reason=\(reason) seconds=900 assertionID=\(assertion) displayWakeRequested=false")
+            log("WAKE_GRACE reason=\(reason) seconds=300 assertionID=\(assertion) displayWakeRequested=false")
         }
     }
 
     private func tick() {
         guard running, cpuAvailable else { return }
+        if apiConfirmedAfterWake {
+            updateAssertion()
+            return
+        }
         guard !scanInFlight else { return }
         scanInFlight = true
         let session = generation
@@ -249,36 +292,32 @@ nonisolated final class JellyfinPowerWorker: @unchecked Sendable {
                 switch result {
                 case .success(let connected):
                     if connected {
-                        grantGrace(reason: "tcp")
+                        extendBootstrap(reason: "tcp")
                     } else {
                         updateAssertion()
                     }
                     snapshot("TCP_SCAN established=\(connected) assertionID=\(assertion)")
-                    if assertion != 0 {
-                        report(connected
-                            ? "Jellyfin connected — keeping Mac awake"
-                            : "Keeping Mac awake for Jellyfin — 15-minute grace period")
-                    }
                 case .failure(let error):
                     snapshot("TCP_SCAN_FAILED \(error.localizedDescription)")
-                    // Preserve protection while detection is unavailable. Only a
-                    // successful scan may conclude that clients disconnected.
-                    grantGrace(reason: "scanFailed")
-                    if assertion != 0 {
-                        report("Cannot inspect Jellyfin connections — keeping Mac awake")
-                    }
+                    // Preserve a short bootstrap window while both TCP and API
+                    // detection are unavailable.
+                    extendBootstrap(reason: "scanFailed")
                 }
             }
         }
     }
 
     private func updateAssertion() {
-        guard let deadline, ContinuousClock.now < deadline else {
+        let now = ContinuousClock.now
+        if let apiDeadline, apiDeadline <= now { self.apiDeadline = nil }
+        if let bootstrapDeadline, bootstrapDeadline <= now { self.bootstrapDeadline = nil }
+        let deadline = [apiDeadline, bootstrapDeadline].compactMap { $0 }.max()
+        guard let deadline, now < deadline else {
             releaseAssertion()
-            report("No Jellyfin connections — system sleep allowed")
+            report("No Jellyfin activity — system sleep allowed")
             return
         }
-        let duration = ContinuousClock.now.duration(to: deadline).components
+        let duration = now.duration(to: deadline).components
         let seconds = max(1, Double(duration.seconds) + Double(duration.attoseconds) / 1e18)
         if assertion != 0 {
             let result = IOPMAssertionSetProperty(assertion, kIOPMAssertionTimeoutKey as CFString,
@@ -288,7 +327,10 @@ nonisolated final class JellyfinPowerWorker: @unchecked Sendable {
                     assertion, kIOPMAssertionLevelKey as CFString,
                     NSNumber(value: kIOPMAssertionLevelOn)
                 )
-                if levelResult == 0 { return }
+                if levelResult == 0 {
+                    reportAssertionStatus()
+                    return
+                }
                 log("ASSERTION_LEVEL_FAILED result=\(levelResult)")
             }
             if result != 0 { log("ASSERTION_RENEW_FAILED result=\(result)") }
@@ -296,7 +338,7 @@ nonisolated final class JellyfinPowerWorker: @unchecked Sendable {
         }
         let properties: [String: Any] = [
             kIOPMAssertionTypeKey: kIOPMAssertNetworkClientActive,
-            kIOPMAssertionNameKey: "Disk Awake: Jellyfin TCP 8096",
+            kIOPMAssertionNameKey: "Disk Awake: Jellyfin Activity",
             kIOPMAssertionLevelKey: kIOPMAssertionLevelOn,
             kIOPMAssertionTimeoutKey: seconds,
             kIOPMAssertionTimeoutActionKey: kIOPMAssertionTimeoutActionTurnOff
@@ -304,11 +346,17 @@ nonisolated final class JellyfinPowerWorker: @unchecked Sendable {
         let result = IOPMAssertionCreateWithProperties(properties as CFDictionary, &assertion)
         log("ASSERTION_CREATE id=\(assertion) result=\(result) seconds=\(seconds) displayWakeRequested=false")
         if result == 0 {
-            report("Keeping Mac awake for Jellyfin — 15-minute grace period")
+            reportAssertionStatus()
         } else {
             assertion = 0
             report("Could not keep Mac awake for Jellyfin")
         }
+    }
+
+    private func reportAssertionStatus() {
+        report(apiDeadline != nil
+            ? "Jellyfin activity — keeping Mac awake"
+            : "Waiting for Jellyfin — 5-minute grace period")
     }
 
     private func releaseAssertion() {
