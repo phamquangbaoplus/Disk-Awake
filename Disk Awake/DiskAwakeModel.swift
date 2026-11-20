@@ -37,6 +37,9 @@ actor DiskWorker {
         }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
+    // Waiting for this actor ensures an earlier pulse has closed its files.
+    func waitForPendingOperations() {}
+
     func pulse(_ disk: MountedDisk, filename: String) throws -> Bool {
         try Task.checkCancellation()
 
@@ -95,7 +98,6 @@ actor DiskWorker {
 final class DiskAwakeModel: NSObject {
     let debugLog = WakeDebugLog()
     let jellyfinActivity: JellyfinActivityMonitor
-    let jellyfin: JellyfinAwakeController
     let jellyfinDrives: JellyfinDriveAwakeController
     var disks: [MountedDisk] = []
     var enabled = UserDefaults.standard.object(forKey: "enabled") as? Bool ?? true {
@@ -116,7 +118,6 @@ final class DiskAwakeModel: NSObject {
     override init() {
         let activity = JellyfinActivityMonitor()
         jellyfinActivity = activity
-        jellyfin = JellyfinAwakeController(activity: activity)
         jellyfinDrives = JellyfinDriveAwakeController(activity: activity)
         super.init()
     }
@@ -144,7 +145,8 @@ final class DiskAwakeModel: NSObject {
             self.activity = nil
         }
         keepMacAwake = false
-        jellyfin.stop()
+        jellyfinActivity.stateChanged = nil
+        mountPolicyTask?.cancel()
         jellyfinDrives.stop()
         debugLog.record("APPLICATION_TERMINATING")
         debugLog.stop()
@@ -162,6 +164,9 @@ final class DiskAwakeModel: NSObject {
     private var suspendedForSystemSleep = false
     private var observingSleep = false
     private let worker = DiskWorker()
+    private let volumeManager = ExternalVolumeManager()
+    private var requestedMountState: Bool?
+    private var mountPolicyTask: Task<Void, Never>?
     private var activity: NSObjectProtocol?
     private let filename: String = {
         let defaults = UserDefaults.standard
@@ -171,15 +176,15 @@ final class DiskAwakeModel: NSObject {
     }()
 
     func start() {
-        jellyfin.debugLog = debugLog
         jellyfinActivity.stateChanged = { [weak self] in
             guard let self else { return }
-            self.jellyfin.activityDidChange()
             self.diskWakePolicyChanged()
         }
         debugLog.start()
-        jellyfin.start()
         jellyfinDrives.start()
+        if enabled || jellyfinDrives.enabled {
+            updateMountPolicy()
+        }
         if !observingSleep {
             let center = NSWorkspace.shared.notificationCenter
             center.addObserver(self, selector: #selector(systemWillSleep),
@@ -280,7 +285,24 @@ final class DiskAwakeModel: NSObject {
         enabled || jellyfinDrives.shouldKeepDrivesAwake
     }
 
+    private func updateMountPolicy() {
+        let shouldMount = drivesShouldBeKeptAwake
+        guard requestedMountState != shouldMount else { return }
+        requestedMountState = shouldMount
+        mountPolicyTask?.cancel()
+        if shouldMount {
+            volumeManager.setMounted(true)
+        } else {
+            mountPolicyTask = Task { [weak self, worker] in
+                await worker.waitForPendingOperations()
+                guard !Task.isCancelled, let self, self.requestedMountState == false else { return }
+                self.volumeManager.setMounted(false)
+            }
+        }
+    }
+
     private func diskWakePolicyChanged() {
+        updateMountPolicy()
         // Do not poll volume metadata while both disk-awake policies are idle:
         // even getattrlist on a mount point can spin up a sleeping HDD.
         if drivesShouldBeKeptAwake {

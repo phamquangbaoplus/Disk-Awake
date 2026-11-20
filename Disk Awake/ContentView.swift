@@ -19,8 +19,6 @@ struct ContentView: View {
                 )
                 .help("Prevents automatic system sleep while this app is running. The display can still sleep, and you can still put your Mac to sleep manually.")
 
-                Divider().opacity(0.6)
-                JellyfinAwakeToggle(controller: model.jellyfin)
             }
 
             ControlSection(
@@ -261,25 +259,5 @@ private struct WriteCountdown: View {
         } else {
             Text("Waiting…").foregroundStyle(.secondary)
         }
-    }
-}
-
-private struct JellyfinAwakeToggle: View {
-    @Bindable var controller: JellyfinAwakeController
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            AwakeToggleRow(
-                "Keep Mac Awake for Jellyfin",
-                isOn: $controller.enabled
-            )
-            if controller.enabled {
-                Text(controller.status)
-                    .lineLimit(1)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-        }
-        .help("Uses the shared Jellyfin API monitor to keep the Mac awake while a session is active and for 5 minutes afterward. TCP port 8096 is checked only during wake/bootstrap or when the API is unavailable. Dark Wake requires AC power and Wake for network access.")
     }
 }

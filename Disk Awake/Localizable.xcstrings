@@ -174,31 +174,12 @@
       }
     },
     "Keep Mac Awake for Jellyfin" : {
+      "extractionState" : "stale",
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "Giữ máy Mac hoạt động cho Jellyfin"
-          }
-        }
-      }
-    },
-    "Waiting for Jellyfin — 5-minute grace period" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Đang chờ Jellyfin – thời gian chờ 5 phút"
-          }
-        }
-      }
-    },
-    "Uses the shared Jellyfin API monitor to keep the Mac awake while a session is active and for 5 minutes afterward. TCP port 8096 is checked only during wake/bootstrap or when the API is unavailable. Dark Wake requires AC power and Wake for network access." : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dùng chung bộ theo dõi Jellyfin API để giữ máy Mac thức khi có phiên hoạt động và thêm 5 phút sau đó. Cổng TCP 8096 chỉ được kiểm tra lúc đánh thức/khởi động hoặc khi API không khả dụng. Dark Wake yêu cầu nguồn AC và tính năng Đánh thức để truy cập mạng."
           }
         }
       }
@@ -316,12 +297,33 @@
         }
       }
     },
+    "Uses the shared Jellyfin API monitor to keep the Mac awake while a session is active and for 5 minutes afterward. TCP port 8096 is checked only during wake/bootstrap or when the API is unavailable. Dark Wake requires AC power and Wake for network access." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dùng chung bộ theo dõi Jellyfin API để giữ máy Mac thức khi có phiên hoạt động và thêm 5 phút sau đó. Cổng TCP 8096 chỉ được kiểm tra lúc đánh thức/khởi động hoặc khi API không khả dụng. Dark Wake yêu cầu nguồn AC và tính năng Đánh thức để truy cập mạng."
+          }
+        }
+      }
+    },
     "Waiting for Jellyfin" : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "Đang chờ Jellyfin"
+          }
+        }
+      }
+    },
+    "Waiting for Jellyfin — 5-minute grace period" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang chờ Jellyfin – thời gian chờ 5 phút"
           }
         }
       }

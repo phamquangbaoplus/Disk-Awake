@@ -6,7 +6,7 @@ import DiskArbitration
 final class ExternalVolumeManager {
     private let session: DASession?
     private var volumes: [String: DADisk] = [:]
-    private var inFlight: Set<String> = []
+    private var inFlight: [String: Bool] = [:]
     private var desiredMounted: Bool?
 
     init() {
@@ -14,6 +14,13 @@ final class ExternalVolumeManager {
         guard let session else { return }
         let context = Unmanaged.passUnretained(self).toOpaque()
         DARegisterDiskAppearedCallback(session, nil, { disk, context in
+            guard let context else { return }
+            MainActor.assumeIsolated {
+                Unmanaged<ExternalVolumeManager>.fromOpaque(context).takeUnretainedValue().appeared(disk)
+            }
+        }, context)
+        // Filesystem details can become available after the initial appearance.
+        DARegisterDiskDescriptionChangedCallback(session, nil, nil, { disk, _, context in
             guard let context else { return }
             MainActor.assumeIsolated {
                 Unmanaged<ExternalVolumeManager>.fromOpaque(context).takeUnretainedValue().appeared(disk)
@@ -28,7 +35,7 @@ final class ExternalVolumeManager {
                 }
             }
         }, context)
-        DASessionScheduleWithRunLoop(session, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
+        DASessionScheduleWithRunLoop(session, CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue)
     }
 
     func setMounted(_ mounted: Bool) {
@@ -48,30 +55,36 @@ final class ExternalVolumeManager {
     }
 
     private func reconcile(_ disk: DADisk) {
-        guard let desiredMounted, let name = DADiskGetBSDName(disk),
-              let description = DADiskCopyDescription(disk) as? [String: Any] else { return }
+        guard let desiredMounted, let session, let name = DADiskGetBSDName(disk),
+              let currentDisk = DADiskCreateFromBSDName(kCFAllocatorDefault, session, name),
+              let description = DADiskCopyDescription(currentDisk) as? [String: Any] else { return }
         let id = String(cString: name)
         let mounted = description[kDADiskDescriptionVolumePathKey as String] != nil
-        guard mounted != desiredMounted, !inFlight.contains(id) else { return }
-        inFlight.insert(id)
+        guard mounted != desiredMounted, inFlight[id] == nil else { return }
+        inFlight[id] = desiredMounted
         let context = Unmanaged.passUnretained(self).toOpaque()
         let callback: DADiskMountCallback = { disk, dissenter, context in
             guard let context else { return }
             MainActor.assumeIsolated {
                 let manager = Unmanaged<ExternalVolumeManager>.fromOpaque(context).takeUnretainedValue()
                 guard let name = DADiskGetBSDName(disk) else { return }
-                manager.inFlight.remove(String(cString: name))
+                let id = String(cString: name)
+                let requestedMount = manager.inFlight.removeValue(forKey: id)
                 if let dissenter {
                     NSLog("Disk Awake: volume operation failed: %@", DADissenterGetStatusString(dissenter) as String? ?? "unknown error")
-                } else {
-                    manager.reconcile(disk)
+                }
+                // Apply a newer policy even when the previous operation failed.
+                // Do not retry a failed operation indefinitely.
+                if let requestedMount, requestedMount != manager.desiredMounted,
+                   let current = manager.volumes[id] {
+                    manager.reconcile(current)
                 }
             }
         }
         if desiredMounted {
-            DADiskMount(disk, nil, DADiskMountOptions(kDADiskMountOptionDefault), callback, context)
+            DADiskMount(currentDisk, nil, DADiskMountOptions(kDADiskMountOptionDefault), callback, context)
         } else {
-            DADiskUnmount(disk, DADiskUnmountOptions(kDADiskUnmountOptionDefault), callback, context)
+            DADiskUnmount(currentDisk, DADiskUnmountOptions(kDADiskUnmountOptionDefault), callback, context)
         }
     }
 }
